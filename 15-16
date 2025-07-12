@@ -1,0 +1,101 @@
+@RestController // api/CommentApiController.java
+pulic class CommentApiController {
+	@Autowired
+    private CommentService commentService;
+}
+
+@Service
+public class CommentService {
+    @Autowired
+    private CommentRepository commentRepository;
+    @Autowired
+    private ArticleRepository articleRepository;
+
+ public List<CommentDto> comments(Long articleId) {
+        /*// 1. 댓글 조회
+        List<Comment> comments = commentRepository.findByArticleId(articleId);
+        // 2. 엔티티 -> DTO 변환
+        List<CommentDto> dtos = new ArrayList<CommentDto>();
+        for (int i = 0; i < comments.size(); i++) {
+            Comment c = comments.get(i);
+            CommentDto dto = CommentDto.createCommentDto(c);
+            dtos.add(dto);
+        }*/
+        // 3. 결과 반환
+        return commentRepository.findByArticleId(articleId)
+                .stream()
+                .map(comment -> CommentDto.createCommentDto(comment))
+                .collect(Collectors.toList());
+
+@PostMapping("/api/articles/{articleId}/comments")
+    public ResponseEntity<CommentDto> create(@PathVariable Long articleId,
+                                             @RequestBody CommentDto dto) {
+        // 서비스에 위임
+        CommentDto createdDto = commentService.create(articleId, dto);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(createdDto);
+    }
+
+public CommentDto create(Long articleId, CommentDto dto) {
+        // 1. 게시글 조회 및 예외 발생
+        Article article = articleRepository.findById(articleId)
+                .orElseThrow(() -> new IllegalArgumentException("댓글 생성 실패! 대상 게시글이 없습니다."));
+        // 2. 댓글 엔티티 생성
+        Comment comment = Comment.createComment(dto, article);
+        // 3. 댓글 엔티티를 DB에 저장
+        Comment created = commentRepository.save(comment);
+        // 4. DTO로 변환해 반환
+        return CommentDto.createCommentDto(created);
+    }
+
+    @Transactional
+    public CommentDto update(Long id, CommentDto dto) {
+        // 1. 댓글 조회 및 예외 발생
+        Comment target = commentRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("댓글 수정 실패! 대상 댓글이 없습니다."));
+        // 2. 댓글 수정
+        target.patch(dto);
+        // 3. DB로 갱신
+        Comment updated = commentRepository.save(target);
+        // 4. 댓글 엔티티를 DTO로 변환 및 반환
+        return CommentDto.createCommentDto(updated);
+    }
+
+@PatchMapping("/api/comments/{id}")
+    public ResponseEntity<CommentDto> update(@PathVariable Long id,
+                                             @RequestBody CommentDto dto) {
+        // 서비스에 위임
+        CommentDto updatedDto = commentService.update(id, dto);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(updatedDto);
+    }
+
+ @DeleteMapping("/api/comments/{id}")
+    public ResponseEntity<CommentDto> delete(@PathVariable Long id) {
+        // 서비스에 위임
+        CommentDto deletedDto = commentService.delete(id);
+        // 결과 응답
+        return ResponseEntity.status(HttpStatus.OK).body(deletedDto);
+    }
+}
+
+ @GetMapping("/articles/{id}")
+    public String show(@PathVariable Long id, Model model) { // 매개변수로 id 받아 오기
+        log.info("id = " + id); // id를 잘 받았는지 확인하는 로그 찍기
+        // 1. id를 조회해 데이터 가져오기
+        Article articleEntity = articleRepository.findById(id).orElse(null);
+        List<CommentDto> commentsDtos = commentService.comments(id);
+        // 2. 모델에 데이터 등록하기
+        model.addAttribute("article", articleEntity);
+        model.addAttribute("commentDtos", commentsDtos); // 댓글 목록 모델에 등록
+        // 3. 뷰 페이지 반환하기
+        return "articles/show";
+    }
+    
+    
+    <a href="/articles/{{article.id}}/edit" class="btn btn-primary">Edit</a>
+<a href="/articles/{{article.id}}/delete" class="btn btn-danger">Delete</a>
+<a href="/articles">Go to Article List</a>
+
+{{>comments/_comments}} <!-- 상세 페이지에 댓글 뷰 파일 삽입 -->
+{{>layouts/footer}}
